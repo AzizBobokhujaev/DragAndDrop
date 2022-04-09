@@ -5,5 +5,6 @@ namespace DragAndDrop.Models
         public int Id { get; set; }
         public string Path { get; set; }
         public int OrderId { get; set; }
+        public bool IsMain { get; set; }
     }
 }

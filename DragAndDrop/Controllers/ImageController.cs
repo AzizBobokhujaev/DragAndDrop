@@ -29,56 +29,86 @@ namespace DragAndDrop.Controllers
         }
 
         [HttpPost("Create")]
-        public async Task<string> CreateImage([FromForm] ImageDto model)
+        public async Task<string> CreateImage([FromForm] ImageDto file)
         {
-            var files = new List<Image>();
-            var filesCount = _context.Images.ToList().Count;
-            if (model.Images == null)
-                return null;
-            foreach (var file in model.Images)
-            {
-                var path = $"wwwroot/Images/";
-                var dbPath = $"Images";
-                var fullPath = Path.GetFullPath(path);
-                if (!Directory.Exists(fullPath))
-                {
-                    Directory.CreateDirectory(fullPath);
-                }
-
-                var fileExtension = Path.GetExtension(file.FileName);
-                var fileName = $"{Guid.NewGuid().ToString()}{fileExtension}";
-                var finalFileName = Path.Combine(fullPath, fileName);
-                var imagePath = Path.Combine(dbPath, fileName);
-                await using (var fileStream = System.IO.File.Create(finalFileName))
-                {
-                    await file.CopyToAsync(fileStream);
-                }
-                files.Add(new Image
-                {
-                    Path = imagePath,
-                    OrderId = filesCount+1 
-                });
+            var allImages = _context.Images.ToList();
+            var path = $"wwwroot/Images/";
+            var dbPath = $"Images";
+            var fullPath = Path.GetFullPath(path);
+            if (!Directory.Exists(fullPath))
+            { 
+                Directory.CreateDirectory(fullPath);
             }
 
-            await _context.Images.AddRangeAsync(files);
+            var fileExtension = Path.GetExtension(file.Images.FileName);
+            var fileName = $"{Guid.NewGuid().ToString()}{fileExtension}";
+            var finalFileName = Path.Combine(fullPath, fileName);
+            var imagePath = Path.Combine(dbPath, fileName);
+            await using (var fileStream = System.IO.File.Create(finalFileName))
+            {
+                await file.Images.CopyToAsync(fileStream);
+            }
+                
+            if (file.IsMain)
+            {
+                foreach (var img in allImages)
+                {
+                    img.IsMain = false;
+                }
+            }
+            var image = new Image()
+            {
+                Path = imagePath, 
+                OrderId = allImages.Count+1, 
+                IsMain = file.IsMain
+            };
+            if (allImages.Count==0) 
+            { 
+                image.IsMain = true;
+            }
+            _context.Images.Add(image);
             await _context.SaveChangesAsync();
             return "created";
         }
 
         [HttpPut("Edit")]
-        public async Task Edit(int id,int orderId)
+        public async Task Edit(int id,bool isMain)
         {
             var image = await _context.Images.FirstOrDefaultAsync(x => x.Id == id);
             if (image==null)
             {
                 return;
             }
-            image.OrderId = orderId;
+            
+            if (isMain || _context.Images.Count()==1)
+            {
+                foreach (var image1 in _context.Images.ToList())
+                {
+                    image1.IsMain = false;
+                }
+
+                image.IsMain = true;
+            }
+            else if (isMain == false && image.IsMain)
+            {
+                image.IsMain = true;
+            }
+            else
+            {
+                image.IsMain = false;
+            }
+
+
+
+            
+            
+            
             _context.Images.Update(image);
             await _context.SaveChangesAsync();
 
         }
 
+        #region Order
         [HttpPut("Order")]
         public async Task<List<Image>> Order(int orderId1, int orderId2)
         {
@@ -132,6 +162,7 @@ namespace DragAndDrop.Controllers
             await _context.SaveChangesAsync();
             return result;
         }
+        #endregion
 
         
         
@@ -152,7 +183,7 @@ namespace DragAndDrop.Controllers
         
         
         
-        /*[HttpGet("GetImageById")]
+        [HttpGet("GetImageById")]
         public async Task<Image> GetImageById(int imageId)
         {
             return await _context.Images.FirstOrDefaultAsync(x => x.Id == imageId);
@@ -165,6 +196,6 @@ namespace DragAndDrop.Controllers
             _context.Images.RemoveRange(images);
             await _context.SaveChangesAsync();
             return true;
-        }*/
+        }
     }
 }
